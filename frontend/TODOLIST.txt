@@ -1,0 +1,33 @@
+Fix – Update the IP Address
+
+1. Update frontend/src/utils/tflite.js
+Change the API_URL to your current IP:
+
+const API_URL = 'http://192.168.0.114:8000/analyze';
+
+2. Update backend/main.py
+Find the line where trimmed_uri is constructed and update it to your current IP:
+
+python
+trimmed_uri = f"http://192.168.0.114:8000/trimmed/{trimmed_filename}"
+
+3. Restart the Backend
+Stop the server (Ctrl+C) and run again:
+
+python main.py
+
+update the ReportIssueScree.js
+to the corresponding email
+
+4. npx expo run:android
+
+set the terminal environment variable:
+set CAMOUFLAKES_GMAIL_APP_PASSWORD=mvexllfeojjslqzv
+
+Change from the ReportIssueScreen.js as well
+
+src/utils/tflite.js	API_URL and baseUrl	~4 and ~52
+src/screens/ReportIssueScreen.js	BACKEND_URL	~12
+src/screens/SettingsPreferencesScreen.js	BACKEND_URL	~17
+
+to deactive the venv, us ethe deactivate symbol

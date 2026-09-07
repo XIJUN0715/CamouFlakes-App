@@ -1,0 +1,39 @@
+# Node modules
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Expo
+.expo/
+dist/
+web-build/
+android/
+ios/
+
+# Backend Python
+backend/venv/
+backend/.venv/
+backend/__pycache__/
+backend/*.pyc
+backend/trimmed_videos/
+backend/screenshots/
+backend/feedback.json
+
+# Large binary files (model file is okay but we exclude it from git if large)
+backend/camouflakes_model.tflite   # optional – can also exclude
+
+# FFmpeg binaries (should never be in git)
+backend/ffmpeg/
+
+# Environment
+.env
+*.env
+
+# IDE
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db

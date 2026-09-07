@@ -1,0 +1,43 @@
+{
+  "expo": {
+    "name": "CamouFlakes",
+    "slug": "camouflakes",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "plugins": [
+      "./plugins/withScreenRecording.js"
+    ],
+    "android": {
+      "statusBar": {
+        "backgroundColor": "#FFFFFF",
+        "barStyle": "dark-content",
+        "translucent": false
+      },
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "package": "com.camouflakes.app",
+      "permissions": [
+        "CAMERA",
+        "RECORD_AUDIO",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE"
+      ]
+    },
+    "ios": {
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "CamouFlakes needs camera access to record videos for deepfake detection.",
+        "NSMicrophoneUsageDescription": "CamouFlakes needs microphone access to record audio for video analysis."
+      }
+    }
+  }
+}
