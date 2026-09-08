@@ -16,10 +16,10 @@ import Header from '../components/Header';
 import BottomNavBar from '../components/BottomNavBar';
 import { loadHistory, clearAllHistory } from '../utils/historyStorage';
 import { getAllReports, clearAllReports } from '../utils/database';
+import { BACKEND_URL } from '../config';
 
 const HISTORY_KEY = '@camouflakes_history';
 const REPORTS_KEY = '@camouflakes_reports';
-const BACKEND_URL = 'http://172.25.223.105:8000';
 
 export default function SettingsPreferencesScreen({ navigation }) {
   const [notifications, setNotifications] = useState(false);

@@ -20,10 +20,10 @@ import { globalStyles, colors } from '../styles/globalStyles';
 import Header from '../components/Header';
 import BottomNavBar from '../components/BottomNavBar';
 import Constants from 'expo-constants';
+import { BACKEND_URL } from '../config';
 
 const MAX_WORDS = 500;
 const MAX_SCREENSHOTS = 5;
-const BACKEND_URL = 'http://172.25.223.105:8000';
 
 const getCleanAndroidVersion = () => {
   const osName = Device.osName || '';

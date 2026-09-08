@@ -26,6 +26,13 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
+# ---------- Server Configuration ----------
+# Use environment variables or fallback to default IP
+SERVER_HOST = os.environ.get("SERVER_HOST", "172.25.223.105")
+SERVER_PORT = os.environ.get("SERVER_PORT", "8000")
+BASE_URL = f"http://{SERVER_HOST}:{SERVER_PORT}"
+logger.info(f"Server BASE_URL: {BASE_URL}")
+
 # ---------- Paths ----------
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MODEL_PATH = os.path.join(BASE_DIR, "camouflakes_model.tflite")
@@ -371,24 +378,24 @@ def _save_evidence_task(job_id: str, raw_path: str, start_time: float):
             trimmed_filename = f"trimmed_{timestamp}.mp4"
             trimmed_path = os.path.join(TRIMMED_VIDEO_DIR, trimmed_filename)
             if trim_video_exact(raw_path, trimmed_path, start_time, duration=5):
-                trimmed_uri = f"http://172.25.223.105:8000/trimmed/{trimmed_filename}"
+                trimmed_uri = f"{BASE_URL}/trimmed/{trimmed_filename}"
                 logger.info(f"[{job_id}] Exact trimmed video saved: {trimmed_uri}")
                 thumb_filename = f"thumbnail_{timestamp}.png"
                 thumb_path = os.path.join(TRIMMED_VIDEO_DIR, thumb_filename)
                 if extract_thumbnail(trimmed_path, thumb_path):
-                    thumbnail_uri = f"http://172.25.223.105:8000/trimmed/{thumb_filename}"
+                    thumbnail_uri = f"{BASE_URL}/trimmed/{thumb_filename}"
                     logger.info(f"[{job_id}] Thumbnail saved: {thumbnail_uri}")
                 else:
                     logger.warning(f"[{job_id}] Thumbnail generation failed; continuing without it.")
             else:
                 logger.warning(f"[{job_id}] Exact trim failed; falling back to transcoding.")
                 if transcode_video(raw_path, trimmed_path, start_time):
-                    trimmed_uri = f"http://172.25.223.105:8000/trimmed/{trimmed_filename}"
+                    trimmed_uri = f"{BASE_URL}/trimmed/{trimmed_filename}"
                     logger.info(f"[{job_id}] Transcoded trimmed video saved: {trimmed_uri}")
                     thumb_filename = f"thumbnail_{timestamp}.png"
                     thumb_path = os.path.join(TRIMMED_VIDEO_DIR, thumb_filename)
                     if extract_thumbnail(trimmed_path, thumb_path):
-                        thumbnail_uri = f"http://172.25.223.105:8000/trimmed/{thumb_filename}"
+                        thumbnail_uri = f"{BASE_URL}/trimmed/{thumb_filename}"
                         logger.info(f"[{job_id}] Thumbnail saved: {thumbnail_uri}")
                 else:
                     logger.warning(f"[{job_id}] All trimming attempts failed; no evidence clip saved.")

@@ -1,8 +1,6 @@
 // src/utils/tflite.js
 import * as FileSystem from 'expo-file-system/legacy';
-
-// Replace with your actual IP
-const API_URL = 'http://172.25.223.105:8000/analyze';
+import { API_URL, BACKEND_URL } from '../config';
 
 export const analyzeVideo = async (videoUri, startTime = 0) => {
   try {
@@ -40,7 +38,7 @@ export const analyzeVideo = async (videoUri, startTime = 0) => {
 };
 
 // ─── NEW: Poll for evidence (trimmed video + thumbnail) ───
-export const pollEvidence = async (jobId, baseUrl = 'http://172.25.223.105:8000') => {
+export const pollEvidence = async (jobId, baseUrl = BACKEND_URL) => {
   try {
     const response = await fetch(`${baseUrl}/evidence/${jobId}`);
     if (!response.ok) {
