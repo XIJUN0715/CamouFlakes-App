@@ -32,7 +32,6 @@ async function ensureLocalFile(uri, targetFileName) {
     }
   }
 
-  // Local file: if the filename doesn't match the target, copy it to a new file
   const uriParts = uri.split('/');
   const originalName = uriParts[uriParts.length - 1];
   if (originalName !== targetFileName) {
@@ -70,6 +69,11 @@ async function saveOneToGallery(sourceUri, fileName) {
   }
 }
 
+// Now also returns the FILE NAMES actually used to save each asset -- once
+// MediaLibrary.createAssetAsync() hands back its own asset URI, the pretty
+// name we gave the file is not reliably recoverable from that URI alone, so
+// the only correct fix is to hand it back here, at the point it's known, for
+// the caller to carry forward.
 export async function saveVideoAndThumbnailToGallery({
   videoUrl,
   thumbnailUrl,
@@ -77,18 +81,26 @@ export async function saveVideoAndThumbnailToGallery({
   isFake,
 }) {
   console.log('[MediaSave] Called with:', { videoUrl, thumbnailUrl, reportRef, isFake });
-  const results = { videoLocalUri: null, thumbnailLocalUri: null };
-  
+  const results = {
+    videoLocalUri: null,
+    thumbnailLocalUri: null,
+    videoFileName: null,
+    thumbnailFileName: null,
+  };
+
   if (videoUrl) {
-    results.videoLocalUri = await saveOneToGallery(videoUrl, safeName(reportRef, 'video', 'mp4'));
+    const videoFileName = safeName(reportRef, 'video', 'mp4');
+    results.videoLocalUri = await saveOneToGallery(videoUrl, videoFileName);
+    results.videoFileName = videoFileName;
   }
-  
+
   if (thumbnailUrl) {
     const thumbName = buildThumbnailFileName(isFake);
     console.log('[MediaSave] Generated thumbnail name:', thumbName);
     results.thumbnailLocalUri = await saveOneToGallery(thumbnailUrl, thumbName);
+    results.thumbnailFileName = thumbName;
   }
-  
+
   console.log('[MediaSave] Results:', results);
   return results;
 }

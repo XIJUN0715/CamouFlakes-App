@@ -84,7 +84,7 @@ const FIXED_MCMC_RELATED = 'Online Content';
 const FIXED_TYPE_OF_SERVICE = 'Social Media';
 
 export default function MCMCReportScreen({ route, navigation }) {
-  const { result, videoUri, thumbnailUri, incidentTimestamp, draftReport } = route.params || {};
+  const { result, videoUri, thumbnailUri, thumbnailFileName, incidentTimestamp, draftReport } = route.params || {};
 
   const isDraft = !!draftReport;
   const reportData = draftReport || {};
@@ -171,6 +171,7 @@ export default function MCMCReportScreen({ route, navigation }) {
       result: { confidence, isFake },
       videoUri: initialVideoUri,
       thumbnailUri: initialThumbnail,
+      thumbnailFileName,
       incidentTimestamp: initialIncidentTimestamp,
       draftDetails: isDraft ? detailsData : undefined,
       isDraft: isDraft,

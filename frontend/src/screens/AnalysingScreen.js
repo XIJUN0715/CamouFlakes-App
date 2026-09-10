@@ -5,10 +5,14 @@ import { Feather } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
 import * as VideoThumbnails from 'expo-video-thumbnails';
 import * as FileSystem from 'expo-file-system/legacy';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { globalStyles, colors } from '../styles/globalStyles';
 import { analyzeVideo, pollEvidence } from '../utils/tflite';
 import { saveVideoAndThumbnailToGallery } from '../utils/mediaSave';
 import { generateCamouFlakesRef } from '../utils/reference';
+
+// Key used to bridge the gallery-saved thumbnail filename to the WebView banner.
+export const LAST_THUMBNAIL_NAME_KEY = '@camouflakes_last_thumbnail_name';
 
 export default function AnalysingScreen({ route, navigation }) {
   const { videoUri, source } = route.params || {};
@@ -20,6 +24,11 @@ export default function AnalysingScreen({ route, navigation }) {
   const [progress, setProgress] = useState(0);
   const [saveStatus, setSaveStatus] = useState('');
   const [isComplete, setIsComplete] = useState(false);
+
+  // ─── NEW: holds the real filename returned by mediaSave.js so we can also
+  //     pass it as a route param to ResultScreen (in addition to the
+  //     AsyncStorage write). Belt-and-braces — the WebView reads either.
+  const lastThumbnailFileNameRef = useRef(null);
 
   const spinValue = useRef(new Animated.Value(0)).current;
   const ringOpacity = useRef(new Animated.Value(1)).current;
@@ -87,23 +96,41 @@ export default function AnalysingScreen({ route, navigation }) {
       console.log('[Analysing] Local thumbnail generated:', destPath);
       return destPath;
     } catch (error) {
-      console.warn('[Analysing] Failed to generate thumbnail locally:', error);
+      console.warn('[Analysing] Failed to generate local thumbnail:', error);
       return null;
     }
   };
 
-  const saveToGalleryInBackground = (trimmedUri, thumbnailUri, isFakeResult) => {
+  // ─── Awaits save, stores the real thumbnail filename both in the ref
+  //     (for the ResultScreen route param) and in AsyncStorage (fallback).
+  const saveToGalleryInBackground = async (trimmedUri, thumbnailUri, isFakeResult) => {
     const fileTag = generateCamouFlakesRef();
-    saveVideoAndThumbnailToGallery({
-      videoUrl: trimmedUri,
-      thumbnailUrl: thumbnailUri,
-      reportRef: fileTag,
-      isFake: isFakeResult,
-    }).then((result) => {
+    try {
+      const result = await saveVideoAndThumbnailToGallery({
+        videoUrl: trimmedUri,
+        thumbnailUrl: thumbnailUri,
+        reportRef: fileTag,
+        isFake: isFakeResult,
+      });
       console.log('[Analysing] Background gallery save completed:', result);
-    }).catch((error) => {
+
+      if (result.thumbnailFileName) {
+        // ─── NEW: keep it in the ref so we can pass it forward.
+        lastThumbnailFileNameRef.current = result.thumbnailFileName;
+
+        try {
+          await AsyncStorage.setItem(LAST_THUMBNAIL_NAME_KEY, result.thumbnailFileName);
+          console.log(
+            '[Analysing] Stored real thumbnail filename:',
+            result.thumbnailFileName
+          );
+        } catch (e) {
+          console.warn('[Analysing] Could not persist thumbnail filename:', e);
+        }
+      }
+    } catch (error) {
       console.warn('[Analysing] Background gallery save failed:', error);
-    });
+    }
   };
 
   useEffect(() => {
@@ -112,7 +139,6 @@ export default function AnalysingScreen({ route, navigation }) {
 
     const run = async () => {
       try {
-        // ─── 1. START INFERENCE ───
         const interval = setInterval(() => {
           if (mounted) setProgress(p => Math.min(p + Math.random() * 15, 95));
         }, 300);
@@ -122,40 +148,36 @@ export default function AnalysingScreen({ route, navigation }) {
         clearInterval(interval);
         if (!mounted) return;
 
-        // ─── 2. GET DETECTION RESULT IMMEDIATELY ───
-        const displayTrimmedUri = null;  // Not available yet
+        const displayTrimmedUri = null;
         let finalThumbnailUri = null;
-
-        // Generate a local thumbnail immediately so ResultScreen has something
         finalThumbnailUri = await generateLocalThumbnail(videoUri, startTime);
 
         setProgress(100);
         setIsComplete(true);
 
-        // ─── 3. START BACKGROUND EVIDENCE POLLING ───
-        // Poll for trimmed video and thumbnail from the server
         const jobId = result.jobId;
         if (jobId) {
           console.log(`[Analysing] Job ID: ${jobId}, starting evidence polling...`);
           let pollCount = 0;
-          const maxPolls = 20; // ~10 seconds max (500ms * 20)
-          
+          const maxPolls = 20;
+
           pollInterval = setInterval(async () => {
             if (!mounted) {
               clearInterval(pollInterval);
               return;
             }
-            
+
             pollCount++;
             try {
               const evidence = await pollEvidence(jobId);
-              
+
               if (evidence.ready && evidence.trimmedUri) {
                 console.log('[Analysing] Evidence ready:', evidence);
                 clearInterval(pollInterval);
                 pollInterval = null;
-                
-                // Save to gallery
+
+                // Fire-and-forget, but now it also persists the real
+                // thumbnail filename for the WebView banner.
                 saveToGalleryInBackground(
                   evidence.trimmedUri,
                   evidence.thumbnailUri || finalThumbnailUri,
@@ -165,16 +187,15 @@ export default function AnalysingScreen({ route, navigation }) {
             } catch (error) {
               console.warn('[Analysing] Poll error:', error);
             }
-            
+
             if (pollCount >= maxPolls) {
               console.log('[Analysing] Evidence polling timeout');
               clearInterval(pollInterval);
               pollInterval = null;
             }
-          }, 500); // Poll every 500ms
+          }, 500);
         }
 
-        // ─── 4. NAVIGATE TO RESULT SCREEN ───
         setTimeout(() => {
           if (mounted) {
             navigation.replace('Result', {
@@ -183,19 +204,20 @@ export default function AnalysingScreen({ route, navigation }) {
               isFake: result.isFake,
               confidence: result.confidence,
               probability: result.probability,
-              trimmedUri: displayTrimmedUri,  // Will be updated by polling
+              trimmedUri: displayTrimmedUri,
               thumbnailUri: finalThumbnailUri,
+              // ─── NEW: pass the real filename forward as a route param.
+              thumbnailFileName: lastThumbnailFileNameRef.current || null,
               duration: 5,
               originalDuration: originalDuration,
               reasoning: result.reasoning || [],
               segments: result.segments || [],
               processingTime: result.processingTime || null,
-              jobId: result.jobId,  // ← Pass jobId to ResultScreen
+              jobId: result.jobId,
             });
           }
         }, 1200);
 
-        // Cleanup on unmount
         return () => {
           if (pollInterval) clearInterval(pollInterval);
         };
@@ -243,11 +265,7 @@ export default function AnalysingScreen({ route, navigation }) {
             opacity: ringOpacity,
           }}
         />
-        <Animated.View
-          style={{
-            transform: [{ scale: checkScale }],
-          }}
-        >
+        <Animated.View style={{ transform: [{ scale: checkScale }] }}>
           <Feather name="check" size={56} color={colors.success} />
         </Animated.View>
       </View>

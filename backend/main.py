@@ -28,7 +28,7 @@ app = FastAPI()
 
 # ---------- Server Configuration ----------
 # Use environment variables or fallback to default IP
-SERVER_HOST = os.environ.get("SERVER_HOST", "172.25.223.105")
+SERVER_HOST = os.environ.get("SERVER_HOST", "192.168.0.114")
 SERVER_PORT = os.environ.get("SERVER_PORT", "8000")
 BASE_URL = f"http://{SERVER_HOST}:{SERVER_PORT}"
 logger.info(f"Server BASE_URL: {BASE_URL}")

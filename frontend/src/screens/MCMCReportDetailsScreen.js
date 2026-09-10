@@ -17,7 +17,7 @@ import { globalStyles, colors } from '../styles/globalStyles';
 const DRAFT_KEY = 'temp_report_details';
 
 export default function MCMCReportDetailsScreen({ route, navigation }) {
-  const { form, result, videoUri, thumbnailUri, incidentTimestamp, draftDetails, isDraft } = route.params || {};
+  const { form, result, videoUri, thumbnailUri, thumbnailFileName, incidentTimestamp, draftDetails, isDraft } = route.params || {};
 
   const [details, setDetails] = useState({
     fullName: '',
@@ -191,6 +191,7 @@ export default function MCMCReportDetailsScreen({ route, navigation }) {
         result,
         videoUri,
         thumbnailUri,
+        thumbnailFileName,
         incidentTimestamp,
         isDraft: true,
       });

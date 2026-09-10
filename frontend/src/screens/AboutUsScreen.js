@@ -15,13 +15,23 @@ export default function AboutUsScreen({ navigation }) {
     try {
       const isAvailable = await MailComposer.isAvailableAsync();
       if (!isAvailable) {
-        Alert.alert('No Email App', 'Please install an email app to contact support.');
+        Alert.alert(
+          'No Email App',
+          'Please install an email app (e.g. Gmail) to contact support.'
+        );
         return;
       }
       await MailComposer.composeAsync({
         recipients: ['camouflakes@gmail.com'],
         subject: 'CamouFlakes Support Request',
-        body: 'Describe your question or issue here:\n\n---\nApp Version: ' + version + ' (' + buildNumber + ')',
+        body:
+          'Describe your question or issue here:\n\n' +
+          '---\n' +
+          'App Version: ' +
+          version +
+          ' (' +
+          buildNumber +
+          ')',
       });
     } catch (error) {
       Alert.alert('Error', 'Unable to open email app.');
@@ -30,7 +40,6 @@ export default function AboutUsScreen({ navigation }) {
 
   return (
     <View style={globalStyles.container}>
-      {/* Added title and showBack */}
       <Header navigation={navigation} title="About Us" showBack />
 
       <ScrollView style={globalStyles.contentContainer} showsVerticalScrollIndicator={false}>
@@ -57,9 +66,9 @@ export default function AboutUsScreen({ navigation }) {
         <View style={globalStyles.card}>
           <Text style={globalStyles.label}>About CamouFlakes</Text>
           <Text style={{ fontSize: 14, color: colors.gray, lineHeight: 22, marginTop: 4 }}>
-            CamouFlakes is an AI-powered deepfake detection app designed to help you verify
-            the authenticity of videos in real-time. Using advanced machine learning models,
-            we analyse video content to identify AI-generated manipulations and protect
+            CamouFlakes is an AI powered deepfake detection app designed to help you verify
+            the authenticity of videos in real time. Using advanced machine learning models,
+            we analyse video content to identify AI generated manipulations and protect
             you from misinformation.
           </Text>
           <Text style={{ fontSize: 14, color: colors.gray, lineHeight: 22, marginTop: 8 }}>
@@ -101,6 +110,50 @@ export default function AboutUsScreen({ navigation }) {
           </Text>
           <Text style={{ fontSize: 13, color: colors.gray, marginTop: 2 }}>
             Built for digital truth
+          </Text>
+        </View>
+
+        {/* Contact Section */}
+        <View style={globalStyles.card}>
+          <Text style={globalStyles.label}>Let's Talk</Text>
+          <Text style={{ fontSize: 13, color: colors.gray, lineHeight: 20, marginTop: 4 }}>
+            Whether you have a question about how CamouFlakes works, would like to share
+            your thoughts with us, or are interested in exploring industry collaboration,
+            we would love to hear from you. Our team is always open to new conversations,
+            partnerships, and ideas that bring us closer to a safer digital world.
+          </Text>
+
+          <TouchableOpacity
+            style={[
+              globalStyles.primaryBtn,
+              {
+                marginTop: 14,
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+              },
+            ]}
+            onPress={handleEmailSupport}
+            activeOpacity={0.85}
+          >
+            <Feather
+              name="mail"
+              size={18}
+              color={colors.white}
+              style={{ marginRight: 8 }}
+            />
+            <Text style={globalStyles.primaryBtnText}>Contact Support</Text>
+          </TouchableOpacity>
+
+          <Text
+            style={{
+              fontSize: 12,
+              color: colors.gray,
+              textAlign: 'center',
+              marginTop: 8,
+            }}
+          >
+            Opens your default email app with our support address pre filled.
           </Text>
         </View>
 

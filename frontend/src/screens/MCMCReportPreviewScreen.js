@@ -15,7 +15,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { generateCamouFlakesRef, formatIncidentTimestamp } from '../utils/reference';
 
 export default function MCMCReportPreviewScreen({ route, navigation }) {
-  const { form, details, result, videoUri, thumbnailUri, incidentTimestamp, isDraft } = route.params || {};
+  const { form, details, result, videoUri, thumbnailUri, thumbnailFileName, incidentTimestamp, isDraft } = route.params || {};
 
   const [reportId, setReportId] = useState(() => generateCamouFlakesRef());
   const contentSignatureRef = useRef(JSON.stringify({ form, details }));
@@ -52,6 +52,7 @@ export default function MCMCReportPreviewScreen({ route, navigation }) {
               reportId,
               videoUri,
               thumbnailUri,
+              thumbnailFileName,
               incidentTimestamp: effectiveIncidentTimestamp,
               isDraft: isDraft || false,
             });

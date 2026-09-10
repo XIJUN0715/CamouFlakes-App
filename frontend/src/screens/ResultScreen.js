@@ -21,10 +21,15 @@ import { pollEvidence } from '../utils/tflite';
 import { saveVideoAndThumbnailToGallery } from '../utils/mediaSave';
 import { generateCamouFlakesRef } from '../utils/reference';
 import MCMCIcon from '../../assets/mcmc-logo.png';
+// ─── NEW: persist the real thumbnail filename for the WebView banner.
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width } = Dimensions.get('window');
 const VIDEO_HEIGHT = 280;
 const VIDEO_WIDTH = width - 42;
+
+// ─── NEW: must match the key read by MCMCWebViewScreen.
+const LAST_THUMBNAIL_NAME_KEY = '@camouflakes_last_thumbnail_name';
 
 const getClassificationText = (isFake, confidence, fakeProb) => {
   if (!isFake) {
@@ -70,6 +75,7 @@ export default function ResultScreen({ route, navigation }) {
     probability,
     trimmedUri: initialTrimmedUri,
     thumbnailUri: initialThumbnailUri,
+    thumbnailFileName,
     duration,
     reasoning,
     segments,
@@ -85,6 +91,14 @@ export default function ResultScreen({ route, navigation }) {
   const [trimmedUri, setTrimmedUri] = useState(initialTrimmedUri || null);
   const [thumbnailUri, setThumbnailUri] = useState(initialThumbnailUri || null);
   const [evidenceLoading, setEvidenceLoading] = useState(!!jobId && !initialTrimmedUri);
+
+  // ─── NEW: the real filename, captured here when the gallery save completes.
+  //     Prefer this over the route param when navigating to MCMCReport,
+  //     because the AnalysingScreen param is often null (its polling times
+  //     out before evidence arrives).
+  const [savedThumbnailFileName, setSavedThumbnailFileName] = useState(
+    thumbnailFileName || null
+  );
 
   // Refs to prevent duplicate polling and saves
   const pollingStartedRef = useRef(false);
@@ -112,7 +126,7 @@ export default function ResultScreen({ route, navigation }) {
     }
   }, [displayVideoUri]);
 
-  // Polling effect – fixed to avoid duplicate saves
+  // Polling effect – captures the real filename when the gallery save finishes
   useEffect(() => {
     if (!jobId || initialTrimmedUri || pollingStartedRef.current) return;
     pollingStartedRef.current = true;
@@ -133,12 +147,32 @@ export default function ResultScreen({ route, navigation }) {
           pollIntervalRef.current = null;
 
           const fileTag = generateCamouFlakesRef();
-          saveVideoAndThumbnailToGallery({
-            videoUrl: evidence.trimmedUri,
-            thumbnailUrl: evidence.thumbnailUri || thumbnailUri,
-            reportRef: fileTag,
-            isFake: isFake,
-          });
+          // ─── CHANGED: await the save and capture the real filename.
+          //     Previously this was fire-and-forget, discarding the return
+          //     value, which is why the WebView banner showed the fallback.
+          (async () => {
+            try {
+              const saved = await saveVideoAndThumbnailToGallery({
+                videoUrl: evidence.trimmedUri,
+                thumbnailUrl: evidence.thumbnailUri || thumbnailUri,
+                reportRef: fileTag,
+                isFake: isFake,
+              });
+              if (saved.thumbnailFileName) {
+                setSavedThumbnailFileName(saved.thumbnailFileName);
+                await AsyncStorage.setItem(
+                  LAST_THUMBNAIL_NAME_KEY,
+                  saved.thumbnailFileName
+                );
+                console.log(
+                  '[ResultScreen] Captured real thumbnail filename:',
+                  saved.thumbnailFileName
+                );
+              }
+            } catch (e) {
+              console.warn('[ResultScreen] Gallery save failed:', e);
+            }
+          })();
         }
       } catch (error) {
         console.warn('[ResultScreen] Poll error:', error);
@@ -160,7 +194,7 @@ export default function ResultScreen({ route, navigation }) {
         pollIntervalRef.current = null;
       }
     };
-  }, [jobId, initialTrimmedUri]); // ← thumbnailUri removed from dependencies
+  }, [jobId, initialTrimmedUri]);
 
   useEffect(() => {
     const sendDetectionNotification = async () => {
@@ -292,6 +326,9 @@ export default function ResultScreen({ route, navigation }) {
       confidence: displayConfidence,
       result: { isFake, confidence: displayConfidence },
       thumbnailUri,
+      // ─── CHANGED: prefer the freshly-captured filename.
+      //     Fall back to the route param only if it hasn't been captured yet.
+      thumbnailFileName: savedThumbnailFileName || thumbnailFileName || null,
       incidentTimestamp,
     });
   };

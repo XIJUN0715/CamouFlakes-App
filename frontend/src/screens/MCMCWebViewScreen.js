@@ -1,5 +1,5 @@
 // src/screens/MCMCWebViewScreen.js
-import React, { useRef, useState, useCallback, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import {
 import { Feather } from '@expo/vector-icons';
 import { WebView } from 'react-native-webview';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { globalStyles, colors } from '../styles/globalStyles';
 import MCMCIcon from '../../assets/mcmc-logo.png';
 import {
@@ -28,6 +29,9 @@ import {
 const REGISTER_URL = 'https://aduan.mcmc.gov.my/#/public/register';
 const NEW_CASE_URL = 'https://aduan.mcmc.gov.my/#/home/newcase';
 
+// Must match the key written by AnalysingScreen
+const LAST_THUMBNAIL_NAME_KEY = '@camouflakes_last_thumbnail_name';
+
 export default function MCMCWebViewScreen({ route, navigation }) {
   const insets = useSafeAreaInsets();
   const {
@@ -37,6 +41,8 @@ export default function MCMCWebViewScreen({ route, navigation }) {
     reportId,
     videoUri,
     thumbnailUri,
+    thumbnailFileName,
+    savedFileName,
     mode: initialMode = 'complaint',
   } = route.params || {};
 
@@ -54,20 +60,24 @@ export default function MCMCWebViewScreen({ route, navigation }) {
   const [showFileHelper, setShowFileHelper] = useState(false);
   const [mcmcCaseId, setMcmcCaseId] = useState(null);
 
-  const isRegisterMode = mode === 'register';
-  const pdfFileName = reportId ? `${reportId}.pdf` : null;
-  const screenshotFileName = thumbnailUri ? thumbnailUri.split('/').pop() : null;
+  // Real thumbnail filename — route param first, then AsyncStorage fallback.
+  const [resolvedThumbnailFileName, setResolvedThumbnailFileName] = useState(
+    thumbnailFileName || null
+  );
 
-  // Set status bar to white to prevent transparency clash
+  const isRegisterMode = mode === 'register';
+
+  // PDF name comes from the real `savedFileName` that pdfGenerator.js produced.
+  const pdfFileName = savedFileName || null;
+  const screenshotFileName = resolvedThumbnailFileName || null;
+
   useEffect(() => {
     if (Platform.OS === 'android') {
       try {
         StatusBar.setBackgroundColor('#FFFFFF');
         StatusBar.setBarStyle('dark-content');
         StatusBar.setTranslucent(false);
-      } catch (e) {
-        // Ignore
-      }
+      } catch (e) {}
     }
     return () => {
       if (Platform.OS === 'android') {
@@ -75,12 +85,53 @@ export default function MCMCWebViewScreen({ route, navigation }) {
           StatusBar.setBackgroundColor('transparent');
           StatusBar.setBarStyle('dark-content');
           StatusBar.setTranslucent(true);
-        } catch (e) {
-          // Ignore
-        }
+        } catch (e) {}
       }
     };
   }, []);
+
+  // ─── FIXED: poll AsyncStorage until the value arrives.
+  //     AnalysingScreen's background gallery save is async and may finish
+  //     AFTER the WebView has already mounted, so a single read can miss it.
+  useEffect(() => {
+    if (resolvedThumbnailFileName) return;
+    let cancelled = false;
+    let attempts = 0;
+    const MAX_ATTEMPTS = 20;   // ~10 seconds total
+    const INTERVAL_MS = 500;
+
+    const tryRead = async () => {
+      try {
+        const stored = await AsyncStorage.getItem(LAST_THUMBNAIL_NAME_KEY);
+        if (!cancelled && stored) {
+          setResolvedThumbnailFileName(stored);
+          console.log('[MCMCWebView] Picked up thumbnail filename:', stored);
+          return true;
+        }
+      } catch (e) {
+        console.warn('[MCMCWebView] Could not read stored thumbnail name:', e);
+      }
+      return false;
+    };
+
+    // Immediate first read so we don't wait 500ms if it's already there.
+    tryRead().then((found) => {
+      if (found || cancelled) return;
+    });
+
+    const interval = setInterval(async () => {
+      attempts++;
+      const found = await tryRead();
+      if (found || cancelled || attempts >= MAX_ATTEMPTS) {
+        clearInterval(interval);
+      }
+    }, INTERVAL_MS);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [resolvedThumbnailFileName]);
 
   const runAutofillForMode = useCallback((forMode) => {
     if (!webViewRef.current) return;
@@ -155,6 +206,8 @@ export default function MCMCWebViewScreen({ route, navigation }) {
             missed: [...(prev && prev.missed ? prev.missed : []), ...data.failed],
           }));
           setStepMessage(null);
+          // Auto-show the "two files to attach" banner when autofill finishes.
+          setShowFileHelper(true);
           break;
         case 'CF_NEXT_CLICKED':
           setStepMessage('Moved to Additional Details…');
@@ -280,9 +333,7 @@ export default function MCMCWebViewScreen({ route, navigation }) {
     );
   };
 
-  // Calculate the top offset for WebView to start below the autofill status bar
   const statusBarHeight = Platform.OS === 'android' ? StatusBar.currentHeight || 40 : 44;
-  // Autofill status bar height: ~50px (padding + TouchableOpacity height)
   const autofillBarHeight = hasLoadedOnce ? 50 : 0;
   const webViewTopOffset = statusBarHeight + autofillBarHeight + (justRegistered ? 34 : 0);
 
@@ -297,7 +348,6 @@ export default function MCMCWebViewScreen({ route, navigation }) {
           </View>
         )}
 
-        {/* WebView with top padding to push it below the autofill status bar */}
         <View style={{ flex: 1, paddingTop: webViewTopOffset }}>
           <WebView
             ref={webViewRef}
@@ -355,14 +405,24 @@ export default function MCMCWebViewScreen({ route, navigation }) {
                 <Feather name="x" size={16} color={colors.gray} />
               </TouchableOpacity>
             </View>
-            {screenshotFileName && (
+            {screenshotFileName ? (
               <Text style={{ color: colors.gray, fontSize: 12, marginTop: 4 }}>
                 "Screenshot of Content" box: {screenshotFileName}
               </Text>
+            ) : (
+              <Text style={{ color: colors.gray, fontSize: 12, marginTop: 4 }}>
+                "Screenshot of Content" box: check your Gallery for the most recent
+                DeepFakeDetected / Genuine CamouFlakes JPG.
+              </Text>
             )}
-            {pdfFileName && (
+            {pdfFileName ? (
               <Text style={{ color: colors.gray, fontSize: 12, marginTop: 2 }}>
                 "Others" box: {pdfFileName}
+              </Text>
+            ) : (
+              <Text style={{ color: colors.gray, fontSize: 12, marginTop: 2 }}>
+                "Others" box: check your Downloads folder for the most recent
+                CamouFlakes_MCMC PDF.
               </Text>
             )}
             <Text style={{ color: colors.gray, fontSize: 11, marginTop: 6 }}>
@@ -371,7 +431,6 @@ export default function MCMCWebViewScreen({ route, navigation }) {
           </View>
         )}
 
-        {/* Bottom Toolbar */}
         <View style={{
           flexDirection: 'row',
           paddingVertical: 14,
